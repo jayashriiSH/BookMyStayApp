@@ -1,3 +1,4 @@
+
 /**
  * UseCase1HotelBookingApp
  *
@@ -8,9 +9,12 @@
  * @author Jayashri
  * @version 1.0
  */
-public class Main {
+public class BookMyStayApp {
 
-
+    /**
+     * The main method is the entry point for the Java application.
+     * @param args command-line arguments (not used)
+     */
     public static void main(String[] args) {
         // Print welcome message
         System.out.println("=======================================");
