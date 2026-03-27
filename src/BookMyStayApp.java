@@ -1,3 +1,4 @@
+import java.io.*;
 import java.util.*;
 
 /**
@@ -6,86 +7,102 @@ import java.util.*;
  * ============================================================
  *
  * Description:
- * Demonstrates concurrent booking with thread safety.
+ * Demonstrates data persistence and recovery using serialization.
  *
  * @author Developer
- * @version 11.1
+ * @version 12.1
  */
 public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        System.out.println("Concurrent Booking Simulation\n");
+        System.out.println("Persistence & Recovery System\n");
 
-        RoomInventory inventory = new RoomInventory();
+        PersistenceService service = new PersistenceService();
 
-        // Shared booking service
-        BookingService service = new BookingService(inventory);
+        // Try loading previous state
+        SystemState state = service.loadState();
 
-        // Threads (simulate multiple users)
-        Thread t1 = new Thread(() -> service.allocateRoom("Alice", "Single"));
-        Thread t2 = new Thread(() -> service.allocateRoom("Bob", "Single"));
-        Thread t3 = new Thread(() -> service.allocateRoom("Charlie", "Single"));
+        if (state == null) {
+            System.out.println("No previous data found. Initializing new system...\n");
 
-        // Start threads
-        t1.start();
-        t2.start();
-        t3.start();
+            state = new SystemState();
+
+            state.inventory.put("Single", 2);
+            state.inventory.put("Double", 1);
+
+            state.bookings.add("R101 - Single");
+            state.bookings.add("R102 - Double");
+        } else {
+            System.out.println("System recovered from file!\n");
+        }
+
+        // Display state
+        System.out.println("Inventory:");
+        for (String key : state.inventory.keySet()) {
+            System.out.println(key + ": " + state.inventory.get(key));
+        }
+
+        System.out.println("\nBookings:");
+        for (String b : state.bookings) {
+            System.out.println(b);
+        }
+
+        // Save state before exit
+        service.saveState(state);
+
+        System.out.println("\nState saved successfully.");
     }
 }
 
 /**
- * CLASS - BookingService
+ * CLASS - SystemState
+ * Stores inventory + booking history
  */
-class BookingService {
+class SystemState implements Serializable {
 
-    private RoomInventory inventory;
+    public Map<String, Integer> inventory;
+    public List<String> bookings;
 
-    public BookingService(RoomInventory inventory) {
-        this.inventory = inventory;
-    }
-
-    // CRITICAL SECTION (synchronized)
-    public synchronized void allocateRoom(String guest, String type) {
-
-        int available = inventory.getAvailability(type);
-
-        if (available <= 0) {
-            System.out.println("Booking Failed for " + guest + " (No rooms)");
-            return;
-        }
-
-        // Simulate delay (race condition scenario)
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        // Update inventory safely
-        inventory.updateAvailability(type, available - 1);
-
-        System.out.println("Booking Confirmed for " + guest);
-    }
-}
-
-/**
- * CLASS - RoomInventory
- */
-class RoomInventory {
-
-    private Map<String, Integer> inventory;
-
-    public RoomInventory() {
+    public SystemState() {
         inventory = new HashMap<>();
-        inventory.put("Single", 1); // only 1 room
+        bookings = new ArrayList<>();
+    }
+}
+
+/**
+ * CLASS - PersistenceService
+ */
+class PersistenceService {
+
+    private static final String FILE_NAME = "system_state.ser";
+
+    // SAVE
+    public void saveState(SystemState state) {
+
+        try (ObjectOutputStream oos =
+                     new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+
+            oos.writeObject(state);
+
+        } catch (IOException e) {
+            System.out.println("Error saving state: " + e.getMessage());
+        }
     }
 
-    public int getAvailability(String type) {
-        return inventory.getOrDefault(type, 0);
-    }
+    // LOAD
+    public SystemState loadState() {
 
-    public void updateAvailability(String type, int count) {
-        inventory.put(type, count);
+        try (ObjectInputStream ois =
+                     new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+
+            return (SystemState) ois.readObject();
+
+        } catch (FileNotFoundException e) {
+            return null; // first run
+        } catch (Exception e) {
+            System.out.println("Error loading state: " + e.getMessage());
+            return null;
+        }
     }
 }
